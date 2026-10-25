@@ -1,0 +1,49 @@
+name: Electrum reviewer qualification (dummy only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-reviewer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout our isolated candidate without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ci-trusted-pr-security-review-20261024
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run actual reviewer script on immutable upstream PR with dummy Claude
+        shell: bash
+        env:
+          PR_NUMBER: "11076"
+          BASE_BRANCH: master
+          CLAUDE_CODE_OAUTH_TOKEN: "dummy-local-only-not-a-secret"
+          GITHUB_REPOSITORY: spesmilo/electrum
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --is-shallow-repository)" = false
+          before="$(git rev-parse HEAD)"
+          git remote set-url origin https://github.com/spesmilo/electrum.git
+          mkdir -p "$RUNNER_TEMP/fake-bin"
+          cat > "$RUNNER_TEMP/fake-bin/claude" <<'PY'
+          #!/usr/bin/env python3
+          import json
+          import sys
+          args=sys.argv[1:]
+          assert "--tools" in args and args[args.index("--tools")+1] == "", args
+          assert "--strict-mcp-config" in args, args
+          assert "--disable-slash-commands" in args, args
+          assert "--dangerously-skip-permissions" not in args, args
+          prompt=sys.stdin.read()
+          assert "Review the following PR diff" in prompt, prompt[:200]
+          assert "ci-trusted-pr-security-review" in prompt, "expected known PR diff"
+          print(json.dumps({"type":"result","is_error":False,"result":"VERDICT: PASS"}))
+          PY
+          chmod +x "$RUNNER_TEMP/fake-bin/claude"
+          export PATH="$RUNNER_TEMP/fake-bin:$PATH"
+          python3 -m py_compile contrib/ci/claude_security_review.py
+          python3 contrib/ci/claude_security_review.py
+          test "$(git rev-parse HEAD)" = "$before"
+          echo "PASS actual Python reviewer, immutable PR diff and tool-free Claude invocation"
