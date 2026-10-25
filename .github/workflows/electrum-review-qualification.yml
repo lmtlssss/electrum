@@ -47,3 +47,15 @@ jobs:
           python3 contrib/ci/claude_security_review.py
           test "$(git rev-parse HEAD)" = "$before"
           echo "PASS actual Python reviewer, immutable PR diff and tool-free Claude invocation"
+
+      - name: Verify published Claude CLI accepts sandbox flags without a credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo npm install -g @anthropic-ai/claude-code
+          claude --version
+          claude --help > "$RUNNER_TEMP/claude-help.txt"
+          grep -F -- '--tools' "$RUNNER_TEMP/claude-help.txt"
+          grep -F -- '--strict-mcp-config' "$RUNNER_TEMP/claude-help.txt"
+          grep -F -- '--disable-slash-commands' "$RUNNER_TEMP/claude-help.txt"
+          echo "PASS published CLI advertises all tool-sandbox flags"
