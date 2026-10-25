@@ -38,7 +38,7 @@ jobs:
           assert "--dangerously-skip-permissions" not in args, args
           prompt=sys.stdin.read()
           assert "Review the following PR diff" in prompt, prompt[:200]
-          assert "ci-trusted-pr-security-review" in prompt, "expected known PR diff"
+          assert "fetch_pr_head" in prompt, "expected pinned-fetch change in PR diff"
           print(json.dumps({"type":"result","is_error":False,"result":"VERDICT: PASS"}))
           PY
           chmod +x "$RUNNER_TEMP/fake-bin/claude"
